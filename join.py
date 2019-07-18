@@ -1,5 +1,6 @@
 import os
 import wx
+import wx.adv
 from PyPDF4 import PdfFileReader, PdfFileWriter
 
 pdfs = "pdf files (*.pdf)|*.pdf|"
@@ -8,20 +9,27 @@ class JoinPanel(wx.Panel):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.input_paths = []
+        self.files_and_paths = {}
         main_sizer = wx.BoxSizer(wx.VERTICAL)
 
         open_button = wx.Button(self, 5, "Select pdfs")
         open_button.Bind(wx.EVT_BUTTON, self.OpenButton)
         main_sizer.Add(open_button, 0, wx.ALL, 5)
 
-        header = wx.StaticText(self, 0, "Selected:")
-        main_sizer.Add(header, 0, wx.LEFT, 5)
-
-        self.input_files = wx.TextCtrl(self, 0, style=wx.TE_MULTILINE)
-        self.input_files.Disable()
+        self.input_files = wx.adv.EditableListBox(
+            self, 0, "Selected:", style=wx.adv.EL_ALLOW_DELETE
+        )
         main_sizer.Add(
-            self.input_files, 5, wx.ALIGN_CENTER|wx.ALL|wx.EXPAND, 5)
+            self.input_files, 5, wx.ALIGN_CENTER|wx.ALL|wx.EXPAND, 5
+        )
+
+        # header = wx.StaticText(self, 0, "Selected:")
+        # main_sizer.Add(header, 0, wx.LEFT, 5)
+
+        # self.input_files = wx.TextCtrl(self, 0, style=wx.TE_MULTILINE)
+        # self.input_files.Disable()
+        # main_sizer.Add(
+        #     self.input_files, 5, wx.ALIGN_CENTER|wx.ALL|wx.EXPAND, 5)
 
         save_button = wx.Button(self, 0, "Join and save")
         save_button.Bind(wx.EVT_BUTTON, self.SaveButton)
@@ -44,11 +52,20 @@ class JoinPanel(wx.Panel):
         )
 
         if dlg.ShowModal() == wx.ID_OK:
-            for file in dlg.GetFilenames():
-                self.input_files.AppendText(file + '\n')
-            for path in dlg.GetPaths():
-                self.input_paths.append(path)
+            for file, path in zip(dlg.GetFilenames(), dlg.GetPaths()):
+                self.files_and_paths[file] = path
+            self.input_files.SetStrings([
+                file for file in self.files_and_paths
+            ])
+
             dlg.Destroy()
+
+        # if dlg.ShowModal() == wx.ID_OK:
+        #     for file in dlg.GetFilenames():
+        #         self.input_files.AppendText(file + '\n')
+        #     for path in dlg.GetPaths():
+        #         self.input_paths.append(path)
+        #     dlg.Destroy()
 
 
     def SaveButton(self, event):
@@ -63,10 +80,14 @@ class JoinPanel(wx.Panel):
 
         if dlg.ShowModal() == wx.ID_OK:
             output_path = dlg.GetPath()
+            input_paths = (
+                self.files_and_paths[file]
+                for file in self.input_files.GetStrings()
+            )
 
             pdf_writer = PdfFileWriter()
 
-            for path in self.input_paths:
+            for path in input_paths:
                 pdf_reader = PdfFileReader(path)
                 for page in range(pdf_reader.getNumPages()):
                     pdf_writer.addPage(pdf_reader.getPage(page))
