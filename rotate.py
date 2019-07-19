@@ -1,26 +1,44 @@
 import os
 import wx
-import wx.adv
 from PyPDF4 import PdfFileReader, PdfFileWriter
 
 pdfs = "pdf files (*.pdf)|*.pdf|"
 
 
-class JoinPanel(wx.Panel):
+class RotatePanel(wx.Panel):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.files_and_paths = {}
+        self.input_path = None
+        self.degrees_list = ['90', '180', '270']
+
         main_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        open_button = wx.Button(self, 5, "Choose files...")
+        open_button = wx.Button(self, 5, "Choose file...")
         open_button.Bind(wx.EVT_BUTTON, self.OpenButton)
-        main_sizer.Add(open_button, 0, wx.TOP|wx.LEFT, 5)
+        main_sizer.Add(open_button, 0, wx.ALL, 5)
 
-        self.input_files = wx.adv.EditableListBox(
-            self, 0, "Selected:", style=wx.adv.EL_ALLOW_DELETE)
+        text = wx.StaticText(self, label="Selected:")
+        main_sizer.Add(text, 0, wx.LEFT, 5)
+
+        self.selected = wx.TextCtrl(self, 0, style=wx.TE_READONLY)
         main_sizer.Add(
-            self.input_files, 5, wx.ALIGN_CENTER|wx.ALL|wx.EXPAND, 5)
+            self.selected, 1, wx.LEFT|wx.RIGHT|wx.BOTTOM|wx.EXPAND, 5)
+
+        text2 = wx.StaticText(self, label="How many degrees clockwise?")
+        main_sizer.Add(text2, 0, wx.LEFT, 5)
+
+        self.set_degrees = wx.RadioBox(
+            self,
+            0,
+            "",
+            wx.DefaultPosition,
+            wx.DefaultSize,
+            self.degrees_list,
+            3,
+            wx.RA_SPECIFY_COLS
+        )
+        main_sizer.Add(self.set_degrees, 0, wx.LEFT, 20)
 
         button_sizer = wx.GridSizer(2)
 
@@ -29,7 +47,7 @@ class JoinPanel(wx.Panel):
         button_sizer.Add(clear_button, 0,
             wx.ALIGN_LEFT|wx.LEFT|wx.BOTTOM|wx.RIGHT, 5)
 
-        save_button = wx.Button(self, 0, "Join and save")
+        save_button = wx.Button(self, 0, "Rotate and save")
         save_button.Bind(wx.EVT_BUTTON, self.SaveButton)
         button_sizer.Add(save_button, 0, wx.ALIGN_RIGHT|wx.RIGHT|wx.BOTTOM, 5)
         main_sizer.Add(button_sizer, 0, wx.EXPAND)
@@ -45,19 +63,15 @@ class JoinPanel(wx.Panel):
             defaultFile="",
             wildcard=pdfs,
             style=wx.FD_OPEN |
-                wx.FD_MULTIPLE |
                 wx.FD_CHANGE_DIR |
                 wx.FD_FILE_MUST_EXIST |
                 wx.FD_PREVIEW
         )
 
         if dlg.ShowModal() == wx.ID_OK:
-            for file, path in zip(dlg.GetFilenames(), dlg.GetPaths()):
-                self.files_and_paths[file] = path
-            self.input_files.SetStrings([
-                file for file in self.files_and_paths
-            ])
-
+            self.input_path = dlg.GetPath()
+            file_name = dlg.GetFilename()
+            self.selected.AppendText(file_name)
             dlg.Destroy()
 
 
@@ -72,18 +86,16 @@ class JoinPanel(wx.Panel):
         )
 
         if dlg.ShowModal() == wx.ID_OK:
+
+            selection = self.set_degrees.GetSelection()
+            degrees = int(self.degrees_list[selection])
             output_path = dlg.GetPath()
-            input_paths = (
-                self.files_and_paths[file]
-                for file in self.input_files.GetStrings()
-            )
-
             pdf_writer = PdfFileWriter()
+            pdf_reader = PdfFileReader(self.input_path)
 
-            for path in input_paths:
-                pdf_reader = PdfFileReader(path)
-                for page in range(pdf_reader.getNumPages()):
-                    pdf_writer.addPage(pdf_reader.getPage(page))
+            for page in range(pdf_reader.getNumPages()):
+                original = pdf_reader.getPage(page)
+                pdf_writer.addPage(original.rotateClockwise(degrees))
 
             with open(output_path, 'wb') as output:
                 pdf_writer.write(output)
@@ -100,29 +112,27 @@ class JoinPanel(wx.Panel):
             self.clear_func()
 
 
+    def clear_func(self):
+        self.input_path = None
+        self.selected.Clear()
+
+
     def Clear_Button(self, event):
         self.clear_func()
 
 
-    def clear_func(self):
-        self.files_and_paths = {}
-        self.input_files.SetStrings([""])
-
-
-class JoinFrame(wx.Frame):
+class RotateFrame(wx.Frame):
     def __init__(self):
         super().__init__(
             None,
-            title="Join pdfs",
-            size=(400, 250),
+            title="Rotate a pdf",
+            size=(400, 170),
         )
-        panel = JoinPanel(self)
-        self.SetSizeHints(400, 250, 400, 250)
+        panel = RotatePanel(self)
+        self.SetSizeHints(400, 170, 400, 170)
         self.Show()
 
 if __name__ == "__main__":
     app = wx.App()
-    frame = JoinFrame()
+    frame = RotateFrame()
     app.MainLoop()
-
-
