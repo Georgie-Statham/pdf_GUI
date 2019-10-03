@@ -71,12 +71,22 @@ class JoinPanel(wx.Panel):
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
         )
 
-        if dlg.ShowModal() == wx.ID_OK:
-            output_path = dlg.GetPath()
-            input_paths = (
-                self.files_and_paths[file]
-                for file in self.input_files.GetStrings()
+        input_paths = [
+            self.files_and_paths[file]
+            for file in self.input_files.GetStrings()
+        ]
+
+        if len(input_paths) < 2:
+            error_dlg = wx.MessageDialog(self,
+                "Please select at least two pdfs to join",
+                "Something went wrong...",
+                wx.OK | wx.ICON_ERROR
             )
+            error_dlg.ShowModal()
+            error_dlg.Destroy()
+
+        elif dlg.ShowModal() == wx.ID_OK:
+            output_path = dlg.GetPath()
 
             pdf_writer = PdfFileWriter()
 
@@ -93,7 +103,8 @@ class JoinPanel(wx.Panel):
 {dlg.GetPath()}.""",
                 "Success!",
                 wx.OK | wx.ICON_INFORMATION
-                )
+            )
+
             success_dlg.ShowModal()
             success_dlg.Destroy()
             dlg.Destroy()
@@ -110,10 +121,11 @@ class JoinPanel(wx.Panel):
 
 
 class JoinFrame(wx.Frame):
-    def __init__(self):
-        super().__init__(
-            None,
-            title="Join pdfs",
+    def __init__(self, title, parent=None):
+        wx.Frame.__init__(
+            self,
+            parent=parent,
+            title=title,
             size=(400, 250),
         )
         panel = JoinPanel(self)

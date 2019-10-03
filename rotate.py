@@ -85,7 +85,16 @@ class RotatePanel(wx.Panel):
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
         )
 
-        if dlg.ShowModal() == wx.ID_OK:
+        if not self.input_path:
+            error_dlg = wx.MessageDialog(self,
+                "Please select a pdf to rotate",
+                "Something went wrong...",
+                wx.OK | wx.ICON_ERROR
+            )
+            error_dlg.ShowModal()
+            error_dlg.Destroy()
+
+        elif dlg.ShowModal() == wx.ID_OK:
 
             selection = self.set_degrees.GetSelection()
             degrees = int(self.degrees_list[selection])
@@ -122,10 +131,11 @@ class RotatePanel(wx.Panel):
 
 
 class RotateFrame(wx.Frame):
-    def __init__(self):
-        super().__init__(
-            None,
-            title="Rotate a pdf",
+    def __init__(self, title, parent=None):
+        wx.Frame.__init__(
+            self,
+            parent=parent,
+            title=title,
             size=(400, 170),
         )
         panel = RotatePanel(self)

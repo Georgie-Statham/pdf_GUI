@@ -79,6 +79,24 @@ class SplitPanel(wx.Panel):
             dlg.Destroy()
 
 
+    def error_message(self, message):
+        error_dlg = wx.MessageDialog(
+            self,
+            message,
+            "Something went wrong...",
+            wx.OK | wx.ICON_ERROR
+        )
+        error_dlg.ShowModal()
+        error_dlg.Destroy()
+
+
+    def check_ranges(self, start, stop):
+        try:
+            return int(start) - 1, int(stop)
+        except ValueError:
+                self.error_message("Please select a valid page range")
+
+
     def format_range(self, pages):
         """
         Converts strings of form "n-m" or "n" into
@@ -86,9 +104,9 @@ class SplitPanel(wx.Panel):
         """
         try:
             start, stop = pages.split('-')
-            return int(start) - 1, int(stop)
+            self.check_ranges(start, stop)
         except ValueError:
-            return int(pages) - 1, int(pages)
+            self.check_ranges(pages, pages)
 
 
     def add_pages(self, pages, writer, reader):
@@ -113,7 +131,10 @@ class SplitPanel(wx.Panel):
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
         )
 
-        if dlg.ShowModal() == wx.ID_OK:
+        if not self.input_path:
+            self.error_message("Please select a pdf to split")
+
+        elif dlg.ShowModal() == wx.ID_OK:
             page_ranges = self.page_input.GetValue().split(',')
             selection = self.set_option.GetSelection()
             join_or_split = self.options[selection]
@@ -155,10 +176,11 @@ class SplitPanel(wx.Panel):
 
 
 class SplitFrame(wx.Frame):
-    def __init__(self):
-        super().__init__(
-            None,
-            title="Split a pdf",
+    def __init__(self, title, parent=None):
+        wx.Frame.__init__(
+            self,
+            parent=parent,
+            title=title,
             size=(400, 200),
         )
         panel = SplitPanel(self)
