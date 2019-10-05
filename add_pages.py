@@ -4,13 +4,12 @@ from PyPDF4 import PdfFileReader, PdfFileWriter
 
 pdfs = "pdf files (*.pdf)|*.pdf|"
 
-
-class RotatePanel(wx.Panel):
+class AddPagesPanel(wx.Panel):
 
     def __init__(self, parent):
         super().__init__(parent)
         self.input_path = None
-        self.degrees_list = ['90', '180', '270']
+        self.input_file = None
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -25,31 +24,24 @@ class RotatePanel(wx.Panel):
         main_sizer.Add(
             self.selected, 1, wx.LEFT|wx.RIGHT|wx.BOTTOM|wx.EXPAND, 5)
 
-        text2 = wx.StaticText(self, label="How many degrees clockwise?")
+        text2 = wx.StaticText(self, label="How many pages would you like to add?")
         main_sizer.Add(text2, 0, wx.LEFT, 5)
 
-        self.set_degrees = wx.RadioBox(
-            self,
-            0,
-            "",
-            wx.DefaultPosition,
-            wx.DefaultSize,
-            self.degrees_list,
-            3,
-            wx.RA_SPECIFY_COLS
-        )
-        main_sizer.Add(self.set_degrees, 0, wx.LEFT, 20)
+        self.no_pages = wx.TextCtrl(self, 0)
+        main_sizer.Add(
+            self.no_pages, 1, wx.LEFT|wx.RIGHT|wx.BOTTOM|wx.EXPAND, 5)
 
         button_sizer = wx.GridSizer(2)
 
         clear_button = wx.Button(self, 0, "Clear")
         clear_button.Bind(wx.EVT_BUTTON, self.Clear_Button)
         button_sizer.Add(clear_button, 0,
-            wx.ALIGN_LEFT|wx.LEFT|wx.BOTTOM|wx.RIGHT, 5)
+            wx.ALIGN_LEFT|wx.LEFT|wx.BOTTOM|wx.RIGHT|wx.TOP, 5)
 
-        save_button = wx.Button(self, 0, "Rotate and save")
+        save_button = wx.Button(self, 0, "Add pages and save")
         save_button.Bind(wx.EVT_BUTTON, self.SaveButton)
-        button_sizer.Add(save_button, 0, wx.ALIGN_RIGHT|wx.RIGHT|wx.BOTTOM, 5)
+        button_sizer.Add(save_button, 0,
+            wx.ALIGN_RIGHT|wx.RIGHT|wx.BOTTOM|wx.TOP, 5)
         main_sizer.Add(button_sizer, 0, wx.EXPAND)
 
         self.SetSizer(main_sizer)
@@ -70,9 +62,20 @@ class RotatePanel(wx.Panel):
 
         if dlg.ShowModal() == wx.ID_OK:
             self.input_path = dlg.GetPath()
-            file_name = dlg.GetFilename()
-            self.selected.AppendText(file_name)
+            self.input_file = dlg.GetFilename()
+            self.selected.AppendText(self.input_file)
             dlg.Destroy()
+
+
+    def error_message(self, message):
+        error_dlg = wx.MessageDialog(
+            self,
+            message,
+            "Something went wrong...",
+            wx.OK | wx.ICON_ERROR
+        )
+        error_dlg.ShowModal()
+        error_dlg.Destroy()
 
 
     def SaveButton(self, event):
@@ -80,30 +83,25 @@ class RotatePanel(wx.Panel):
             self,
             message="Save file as...",
             defaultDir=os.getcwd(),
-            defaultFile="",
+            defaultFile=self.input_file + "+" + self.no_pages.GetValue(),
             wildcard=pdfs,
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
         )
 
         if not self.input_path:
-            error_dlg = wx.MessageDialog(self,
-                "Please select a pdf to rotate",
-                "Something went wrong...",
-                wx.OK | wx.ICON_ERROR
-            )
-            error_dlg.ShowModal()
-            error_dlg.Destroy()
+            self.error_message("Please select a pdf")
 
         elif dlg.ShowModal() == wx.ID_OK:
-            selection = self.set_degrees.GetSelection()
-            degrees = int(self.degrees_list[selection])
             output_path = dlg.GetPath()
             pdf_writer = PdfFileWriter()
             pdf_reader = PdfFileReader(self.input_path)
-
-            for page in range(pdf_reader.getNumPages()):
-                original = pdf_reader.getPage(page)
-                pdf_writer.addPage(original.rotateClockwise(degrees))
+            try:
+                blank_pages = int(self.no_pages.GetValue())
+            except ValueError:
+                self.error_message("The number of pages added must be an integer")
+            pdf_writer.appendPagesFromReader(pdf_reader)
+            for _ in range(blank_pages):
+                pdf_writer.addBlankPage()
 
             with open(output_path, 'wb') as output:
                 pdf_writer.write(output)
@@ -129,7 +127,7 @@ class RotatePanel(wx.Panel):
         self.clear_func()
 
 
-class RotateFrame(wx.Frame):
+class AddPagesFrame(wx.Frame):
     def __init__(self, title, parent=None):
         wx.Frame.__init__(
             self,
@@ -137,11 +135,11 @@ class RotateFrame(wx.Frame):
             title=title,
             size=(400, 170),
         )
-        panel = RotatePanel(self)
+        panel = AddPagesPanel(self)
         self.SetSizeHints(400, 170, 400, 170)
         self.Show()
 
 if __name__ == "__main__":
     app = wx.App()
-    frame = RotateFrame()
+    frame = AddPagesFrame()
     app.MainLoop()
