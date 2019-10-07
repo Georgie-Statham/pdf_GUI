@@ -1,6 +1,7 @@
 import os
 import wx
 from PyPDF4 import PdfFileReader, PdfFileWriter
+from pathlib import Path
 
 pdfs = "pdf files (*.pdf)|*.pdf|"
 
@@ -79,11 +80,15 @@ class AddPagesPanel(wx.Panel):
 
 
     def SaveButton(self, event):
+        input_filename = Path(self.input_file)
         dlg = wx.FileDialog(
             self,
             message="Save file as...",
             defaultDir=os.getcwd(),
-            defaultFile=self.input_file + "+" + self.no_pages.GetValue(),
+            defaultFile=(
+                f"{input_filename.with_suffix('')}+"
+                f"{self.no_pages.GetValue()}"
+            ),
             wildcard=pdfs,
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
         )
@@ -121,6 +126,7 @@ class AddPagesPanel(wx.Panel):
     def clear_func(self):
         self.input_path = None
         self.selected.Clear()
+        self.no_pages.Clear()
 
 
     def Clear_Button(self, event):

@@ -30,13 +30,19 @@ class MainPanel(wx.Panel):
         )
 
         add_pages_button = wx.Button(self, 5, 'Add Blank Pages')
-        add_pages_button.Bind(wx.EVT_BUTTON, self.get_add_pages_frame)
+        add_pages_button.Bind(
+            wx.EVT_BUTTON, self.get_add_pages_frame)
         main_sizer.Add(
             add_pages_button, 1, wx.TOP|wx.RIGHT|wx.BOTTOM|wx.EXPAND, 5
         )
 
         self.SetSizer(main_sizer)
 
+    # def get_other_frame(self, event, frame, title):
+    #     frame = frame(
+    #         title=title,
+    #         parent=wx.GetTopLevelParent(self)
+    #     )
 
     def get_join_frame(self, event):
         frame = JoinFrame(

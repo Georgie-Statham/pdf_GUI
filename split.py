@@ -92,7 +92,8 @@ class SplitPanel(wx.Panel):
 
     def check_ranges(self, start, stop):
         try:
-            return int(start) - 1, int(stop)
+            start, stop = int(start) - 1, int(stop)
+            return (start, stop)
         except ValueError:
                 self.error_message("Please select a valid page range")
 
@@ -104,16 +105,25 @@ class SplitPanel(wx.Panel):
         """
         try:
             start, stop = pages.split('-')
-            self.check_ranges(start, stop)
+            return self.check_ranges(start, stop)
+
         except ValueError:
-            self.check_ranges(pages, pages)
+            return self.check_ranges(pages, pages)
 
 
     def add_pages(self, pages, writer, reader):
         start, stop = self.format_range(pages)
-        for page in range(start, stop):
-            writer.addPage(reader.getPage(page))
-        return writer
+        try:
+            for page in range(start, stop):
+                writer.addPage(reader.getPage(page))
+            return writer
+        except IndexError:
+            self.error_message(
+                "The page range you have selected exceeds the length "
+                "of the pdf.\n" # This works, but then file is saved and
+                # success message pops up. Need to figure out how to return
+                # to split window at this point
+            )
 
 
     def save_file(self, output, writer):
@@ -145,7 +155,10 @@ class SplitPanel(wx.Panel):
                 for page_range in page_ranges:
                     pdf_writer = PdfFileWriter()
                     self.add_pages(page_range, pdf_writer, pdf_reader)
-                    output = f"{output_name.with_suffix('')}_p{page_range}.pdf"
+                    output = (
+                        f"{output_name.with_suffix('')}"
+                        f"_p{page_range.strip()}.pdf"
+                    )
                     self.save_file(output, pdf_writer)
             else:
                 pdf_writer = PdfFileWriter()
