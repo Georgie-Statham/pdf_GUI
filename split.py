@@ -11,6 +11,7 @@ class SplitPanel(wx.Panel):
         super().__init__(parent)
         self.input_path = None
         self.options = ['Join segments', 'Split segments']
+        self.formatted_ranges = []
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -90,40 +91,48 @@ class SplitPanel(wx.Panel):
         error_dlg.Destroy()
 
 
-    def check_ranges(self, start, stop):
-        try:
-            start, stop = int(start) - 1, int(stop)
-            return (start, stop)
-        except ValueError:
+    def format_ranges(self):
+        """
+        Converts strings containig comma separated page ranges into list
+        of start, stop tuples. Checks that pages ranges are of the form n-m or n where n and m are integers, and that they don't exceed the length of the input pdf.
+        """
+        page_ranges = self.page_input.GetValue().split(',')
+        pdf_reader = PdfFileReader(self.input_path)
+        input_length = pdf_reader.getNumPages()
+        for page_range in page_ranges:
+            try:
+                start, stop = page_range.split('-')
+                self.formatted_ranges.append((start, stop, page_range))
+            except ValueError:
+                self.formatted_ranges.append(
+                    (page_range, page_range, page_range)
+                )
+        for n, page_range in enumerate(self.formatted_ranges):
+            try:
+                start, stop, page_range = page_range
+                start, stop = int(start) - 1, int(stop)
+                self.formatted_ranges[n] = start, stop, page_range
+                if stop > input_length:
+                    length_error_dlg = wx.MessageDialog(
+                        self,
+                        (
+                            "Page range exceeds length of pdf, which "
+                            f"is {input_length} pages."
+                        ),
+                        "Something went wrong...",
+                        wx.OK | wx.ICON_ERROR
+                    )
+                    length_error_dlg.ShowModal()
+                    length_error_dlg.Destroy()
+                    self.clear_ranges()
+
+                elif stop < start + 1:
+                    self.error_message("Please select a valid page range")
+                    self.clear_ranges()
+            except ValueError:
                 self.error_message("Please select a valid page range")
-
-
-    def format_range(self, pages):
-        """
-        Converts strings of form "n-m" or "n" into
-        format required for python range function.
-        """
-        try:
-            start, stop = pages.split('-')
-            return self.check_ranges(start, stop)
-
-        except ValueError:
-            return self.check_ranges(pages, pages)
-
-
-    def add_pages(self, pages, writer, reader):
-        start, stop = self.format_range(pages)
-        try:
-            for page in range(start, stop):
-                writer.addPage(reader.getPage(page))
-            return writer
-        except IndexError:
-            self.error_message(
-                "The page range you have selected exceeds the length "
-                "of the pdf.\n" # This works, but then file is saved and
-                # success message pops up. Need to figure out how to return
-                # to split window at this point
-            )
+                self.clear_ranges()
+        return self.formatted_ranges
 
 
     def save_file(self, output, writer):
@@ -132,55 +141,68 @@ class SplitPanel(wx.Panel):
 
 
     def SaveButton(self, event):
-        dlg = wx.FileDialog(
-            self,
-            message="Save file as...",
-            defaultDir=os.getcwd(),
-            defaultFile="",
-            wildcard=pdfs,
-            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
-        )
+        self.format_ranges()
+        if self.formatted_ranges:
 
-        if not self.input_path:
-            self.error_message("Please select a pdf to split")
+            dlg = wx.FileDialog(
+                self,
+                message="Save file as...",
+                defaultDir=os.getcwd(),
+                defaultFile="",
+                wildcard=pdfs,
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+            )
 
-        elif dlg.ShowModal() == wx.ID_OK:
-            page_ranges = self.page_input.GetValue().split(',')
-            selection = self.set_option.GetSelection()
-            join_or_split = self.options[selection]
-            output_path = dlg.GetPath()
-            output_name = Path(dlg.GetFilename())
-            pdf_reader = PdfFileReader(self.input_path)
-            if join_or_split == 'Split segments':
-                for page_range in page_ranges:
+            if not self.input_path:
+                self.error_message("Please select a pdf to split")
+
+
+            elif dlg.ShowModal() == wx.ID_OK:
+                selection = self.set_option.GetSelection()
+                join_or_split = self.options[selection]
+                output_path = dlg.GetPath()
+                output_name = Path(dlg.GetFilename())
+                pdf_reader = PdfFileReader(self.input_path)
+                if join_or_split == 'Split segments':
+                    for item in self.formatted_ranges:
+                        pdf_writer = PdfFileWriter()
+                        start, stop, page_range = item
+                        for page in range(start, stop):
+                            pdf_writer.addPage(pdf_reader.getPage(page))
+                        output = (
+                            f"{output_name.with_suffix('')}"
+                            f"_p{page_range.strip()}.pdf"
+                        )
+                        self.save_file(output, pdf_writer)
+                else:
                     pdf_writer = PdfFileWriter()
-                    self.add_pages(page_range, pdf_writer, pdf_reader)
-                    output = (
-                        f"{output_name.with_suffix('')}"
-                        f"_p{page_range.strip()}.pdf"
-                    )
-                    self.save_file(output, pdf_writer)
-            else:
-                pdf_writer = PdfFileWriter()
-                for page_range in page_ranges:
-                    self.add_pages(page_range, pdf_writer, pdf_reader)
-                self.save_file(output_path, pdf_writer)
+                    for item in self.formatted_ranges:
+                        start, stop, _ = item
+                        for page in range(start, stop):
+                            pdf_writer.addPage(pdf_reader.getPage(page))
+                    self.save_file(output_path, pdf_writer)
 
-            success_dlg = wx.MessageDialog(self,
-                f"""Your file/s {dlg.GetFilename()} are saved at
-{dlg.GetPath()}.""",
-                "Success!",
-                wx.OK | wx.ICON_INFORMATION
-                )
-            success_dlg.ShowModal()
-            success_dlg.Destroy()
-            dlg.Destroy()
-            self.clear_func()
+                success_dlg = wx.MessageDialog(self,
+                    f"""Your file/s {dlg.GetFilename()} are saved at
+    {dlg.GetPath()}.""",
+                    "Success!",
+                    wx.OK | wx.ICON_INFORMATION
+                    )
+                success_dlg.ShowModal()
+                success_dlg.Destroy()
+                dlg.Destroy()
+                self.clear_func()
 
 
     def clear_func(self):
         self.input_path = None
+        self.formatted_ranges = []
         self.file_selected.Clear()
+        self.page_input.Clear()
+
+
+    def clear_ranges(self):
+        self.formatted_ranges = []
         self.page_input.Clear()
 
 
